@@ -1,0 +1,84 @@
+Write a Stored Procedure namely proc_Grade for the categorization of student. If marks scored by students in examination is <=1500 and marks>=990 then student will be placed in distinction category if marks scored are between 989 and900 category is first class, if marks 899 and 825 category is Higher Second Class .
+
+Consider Schema as Stud_Marks(name, total_marks) and Result(Roll,Name, Class) 
+----------------------------------------------------------------------------------------------------------------------
+
+CREATE TABLE Stud_Marks (
+  Roll INT PRIMARY KEY,
+  Name VARCHAR(100),
+  total_marks INT
+);
+
+CREATE TABLE Result (
+  Roll INT,
+  Name VARCHAR(100),
+  Class VARCHAR(20)
+);
+
+INSERT INTO Stud_Marks (Roll, Name, total_marks) VALUES
+(1, 'Alice', 1500),     -- Distinction (Upper boundary)
+(2, 'Bob', 990),        -- Distinction (Lower boundary)
+(3, 'Charlie', 989),    -- First Class (Upper boundary)
+(4, 'David', 900),      -- First Class (Lower boundary)
+(5, 'Eva', 899),        -- Higher Second Class (Upper boundary)
+(6, 'Frank', 825),      -- Higher Second Class (Lower boundary)
+(7, 'Grace', 824),      -- Others (Just below Higher Second Class)
+(8, 'Hannah', 750),     -- Others (Far below any category)
+(9, 'Ian', 0),          -- Others (Lowest possible marks)
+(10, 'Jack', 1600);     -- Others (Above maximum marks, invalid but included for robustness)
+
+
+
+DELIMITER //
+
+CREATE PROCEDURE proc_Grade()
+BEGIN
+  DECLARE done INT DEFAULT FALSE;
+  DECLARE vRoll INT;
+  DECLARE vName VARCHAR(100);
+  DECLARE vMarks INT;
+  DECLARE vClass VARCHAR(20);
+  
+  DECLARE cur CURSOR FOR 
+    SELECT Roll, Name, total_marks FROM Stud_Marks;
+    
+  DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+  
+  -- Clear previous results
+  DELETE FROM Result;
+  
+  OPEN cur;
+  
+  read_loop: LOOP
+    FETCH cur INTO vRoll, vName, vMarks;
+    IF done THEN
+      LEAVE read_loop;
+    END IF;
+    
+    -- Determine class category based on marks
+    IF vMarks <= 1500 AND vMarks >= 990 THEN
+      SET vClass = 'Distinction';
+    ELSEIF vMarks BETWEEN 900 AND 989 THEN
+      SET vClass = 'First Class';
+    ELSEIF vMarks BETWEEN 825 AND 899 THEN
+      SET vClass = 'Higher Second Class';
+    ELSE
+      SET vClass = 'Others';
+    END IF;
+    
+    -- Insert into Result table
+    INSERT INTO Result(Roll, Name, Class) VALUES (vRoll, vName, vClass);
+    
+  END LOOP;
+  
+  CLOSE cur;
+END;
+//
+DELIMITER ;
+
+
+
+CALL proc_Grade();
+
+
+SELECT * FROM Result ORDER BY Roll;

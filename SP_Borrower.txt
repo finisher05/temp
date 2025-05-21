@@ -1,0 +1,146 @@
+Use of Control structure and Exception handling is mandatory. 
+
+Schema: 
+1. Borrower(Rollin, Name, DateofIssue, NameofBook, Status) 
+2. Fine(Roll_no,Date,Amt) 
+3. Library (bid, bname, doi, status,noc)
+4. transaction (tid,bid, bname, status)
+
+
+
+1.	Accept roll_no & name of book from user. 
+2.	Check the number of days (from date of issue), if days are between 15 to 30 then fine amount will be Rs 5per day. 
+3.	If no. of days>30, per day fine will be Rs 50 per day & for days less than 30, Rs. 5 per day. 
+4.	After submitting the book, status will change from I to R.
+5.	Update the noc in library according to the transaction made.  Increase the noc if status is RETURN, Decrease noc if status is ISSUE.
+6.	If condition of fine is true, then details will be stored into fine table.
+---------------------------------------------------------------------------------------------------------------------
+
+
+CREATE TABLE Borrower (
+    Rollin INT,
+    Name VARCHAR(100),
+    DateofIssue DATE,
+    NameofBook VARCHAR(100),
+    Status CHAR(1)
+);
+
+CREATE TABLE Fine (
+    Roll_no INT,
+    Date DATE,
+    Amt INT
+);
+
+CREATE TABLE Library (
+    bid INT,
+    bname VARCHAR(100),
+    doi DATE,
+    status CHAR(1),
+    noc INT
+);
+
+CREATE TABLE transaction (
+    tid INT,
+    bid INT,
+    bname VARCHAR(100),
+    status VARCHAR(10)
+);
+
+
+INSERT INTO Borrower VALUES
+(1, 'Alice', DATE_SUB(CURDATE(), INTERVAL 10 DAY), 'Book A', 'I'),
+(2, 'Bob', DATE_SUB(CURDATE(), INTERVAL 20 DAY), 'Book B', 'I'),
+(3, 'Charlie', DATE_SUB(CURDATE(), INTERVAL 35 DAY), 'Book C', 'I');
+
+INSERT INTO Library VALUES
+(101, 'Book A', NULL, 'I', 2),
+(102, 'Book B', NULL, 'I', 3),
+(103, 'Book C', NULL, 'I', 1);
+
+INSERT INTO transaction VALUES
+(1, 101, 'Book A', 'ISSUE'),
+(2, 102, 'Book B', 'ISSUE'),
+(3, 103, 'Book C', 'ISSUE');
+
+
+
+DELIMITER //
+CREATE PROCEDURE ReturnBookWithFine(IN p_rollno INT, IN p_bookname VARCHAR(100))
+BEGIN
+    DECLARE v_doi DATE;
+    DECLARE v_days INT;
+    DECLARE v_amt INT DEFAULT 0;
+    DECLARE v_bid INT;
+    DECLARE not_found INT DEFAULT 0;
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT 'An error occurred, rollback complete.' AS ErrorMessage;
+    END;
+
+    START TRANSACTION;
+
+    -- Check if book is issued to this student
+    SELECT DateofIssue INTO v_doi
+    FROM Borrower
+    WHERE Rollin = p_rollno AND NameofBook = p_bookname AND Status = 'I';
+
+    SET v_days = DATEDIFF(CURDATE(), v_doi);
+
+    IF v_days > 30 THEN
+        SET v_amt = (v_days - 30) * 50 + 15 * 5;
+    ELSEIF v_days > 15 THEN
+        SET v_amt = (v_days - 15) * 5;
+    END IF;
+
+    -- Update Borrower table
+    UPDATE Borrower SET Status = 'R'
+    WHERE Rollin = p_rollno AND NameofBook = p_bookname;
+
+    -- Find book ID
+    SELECT bid INTO v_bid FROM Library WHERE bname = p_bookname;
+
+    -- Update transaction table
+    UPDATE transaction SET status = 'RETURN'
+    WHERE bid = v_bid AND bname = p_bookname;
+
+    -- Update Library table (increase noc)
+    UPDATE Library SET noc = noc + 1
+    WHERE bid = v_bid;
+
+    -- Insert fine if applicable
+    IF v_amt > 0 THEN
+        INSERT INTO Fine(Roll_no, Date, Amt)
+        VALUES (p_rollno, CURDATE(), v_amt);
+    END IF;
+
+    COMMIT;
+END;//
+
+DELIMITER ;
+
+
+
+CALL ReturnBookWithFine(2, 'Book B');
+CALL ReturnBookWithFine(3, 'Book C');
+
+
+
+CREATE  VIEW ReturnOperationSummary AS
+SELECT
+    b.Rollin,
+    b.Name AS BorrowerName,
+    b.NameofBook,
+    b.DateofIssue,
+    b.Status AS BorrowerStatus,
+    DATEDIFF(CURDATE(), b.DateofIssue) AS DaysSinceIssue,
+    CASE
+        WHEN DATEDIFF(CURDATE(), b.DateofIssue) > 30 THEN (DATEDIFF(CURDATE(), b.DateofIssue) - 30) * 50 + 15 * 5
+        WHEN DATEDIFF(CURDATE(), b.DateofIssue) > 15 THEN (DATEDIFF(CURDATE(), b.DateofIssue) - 15) * 5
+        ELSE 0
+    END AS CalculatedFine,
+    f.Amt AS RecordedFine
+FROM Borrower b
+LEFT JOIN Fine f ON b.Rollin = f.Roll_no AND f.Date = CURDATE()
+WHERE b.Status = 'R';

@@ -1,0 +1,75 @@
+Write a database trigger on Library table. The System should keep track of the records that are being updated or deleted. The old value of updated or deleted records should be added in Library_Audit table. 
+---------------------------------------------------------------------------------------------------------------------
+
+CREATE TABLE Library (
+    bid INT PRIMARY KEY,
+    bname VARCHAR(100),
+    doi DATE,
+    status ENUM('ISSUE', 'RETURN', 'FINE'),
+    noc INT
+);
+
+
+CREATE TABLE Library_Audit (
+    audit_id INT AUTO_INCREMENT PRIMARY KEY,
+    bid INT,
+    bname VARCHAR(100),
+    doi DATE,
+    status ENUM('ISSUE', 'RETURN', 'FINE'),
+    noc INT,
+    action_type VARCHAR(10),  -- 'UPDATE' or 'DELETE'
+    action_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+
+DELIMITER //
+
+CREATE TRIGGER trg_after_update_library
+AFTER UPDATE ON Library
+FOR EACH ROW
+BEGIN
+    INSERT INTO Library_Audit (bid, bname, doi, status, noc, action_type)
+    VALUES (OLD.bid, OLD.bname, OLD.doi, OLD.status, OLD.noc, 'UPDATE');
+END;
+//
+
+DELIMITER ;
+
+
+DELIMITER //
+
+CREATE TRIGGER trg_after_delete_library
+AFTER DELETE ON Library
+FOR EACH ROW
+BEGIN
+    INSERT INTO Library_Audit (bid, bname, doi, status, noc, action_type)
+    VALUES (OLD.bid, OLD.bname, OLD.doi, OLD.status, OLD.noc, 'DELETE');
+END;
+//
+
+DELIMITER ;
+
+
+
+INSERT INTO Library (bid, bname, doi, status, noc) VALUES
+(1, 'Database Systems', '2025-05-01', 'ISSUE', 5),
+(2, 'Operating Systems', '2025-05-10', 'RETURN', 3),
+(3, 'AI Basics', '2025-05-20', 'ISSUE', 4);
+
+
+
+UPDATE Library
+SET noc = 2, status = 'FINE'
+WHERE bid = 2;
+
+DELETE FROM Library
+WHERE bid = 1;
+
+UPDATE Library SET noc = 7 WHERE bid = 3;
+
+
+SELECT * FROM Library_Audit ORDER BY action_timestamp DESC;
+
+

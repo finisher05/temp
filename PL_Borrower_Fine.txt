@@ -1,0 +1,119 @@
+Create PL/SQL code block: Write a PL/SQL block of code for the following schema: 
+ Borrower(Rollin, Name, DateofIssue, NameofBook, Status) 
+ Fine(Roll_no,Date,Amt) 
+
+Solve following queries:
+1.	Accept roll_no & name of book from user. 
+2.	Check the number of days (from date of issue), if days are between 15 to 30 then fine amount will be Rs 5per day. 
+3.	If no. of days>30, per day fine will be Rs 50 per day & for days less than 30, Rs. 5 per day. 
+4.	After submitting the book, status will change from I to R. 
+5.	If condition of fine is true, then details will be stored into fine table. 
+Use of Control structure and Exception handling is mandatory.
+---------------------------------------------------------------------------------------------------------------------
+
+
+-- Borrower table
+CREATE TABLE Borrower (
+    Rollin INT,
+    Name VARCHAR(100),
+    DateofIssue DATE,
+    NameofBook VARCHAR(255),
+    Status CHAR(1),  -- 'I' for Issued, 'R' for Returned
+    PRIMARY KEY (Rollin, NameofBook, DateofIssue)
+);
+
+-- Fine table
+CREATE TABLE Fine (
+    FineID INT AUTO_INCREMENT PRIMARY KEY,
+    Roll_no INT,
+    Date DATE,
+    Amt INT
+);
+
+
+
+INSERT INTO Borrower VALUES
+(101, 'Alice', CURDATE() - INTERVAL 10 DAY, 'Data Structures', 'I'),  -- no fine (10 days)
+(102, 'Bob', CURDATE() - INTERVAL 20 DAY, 'Operating Systems', 'I'),  -- fine @ 5/day for 6 days (20 - 14)
+(103, 'Charlie', CURDATE() - INTERVAL 35 DAY, 'Database Systems', 'I'), -- fine @ 5/day for 16 days + 50/day for 5 days
+(104, 'David', CURDATE() - INTERVAL 5 DAY, 'Networks', 'I'),           -- no fine (5 days)
+(105, 'Eve', CURDATE() - INTERVAL 30 DAY, 'Algorithms', 'R');          -- already returned, no action expected
+
+
+
+
+
+DELIMITER //
+
+CREATE PROCEDURE proc_ReturnBook (
+    IN p_roll_no INT,
+    IN p_book_name VARCHAR(255)
+)
+BEGIN
+    DECLARE v_dateofissue DATE;
+    DECLARE v_days INT;
+    DECLARE v_fine_amt INT DEFAULT 0;
+    DECLARE v_status CHAR(1);
+    DECLARE v_today DATE;
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SELECT 'An unexpected error occurred.' AS ErrorMessage;
+    END;
+
+    -- Check if book exists and is issued
+    IF EXISTS (
+        SELECT 1 FROM Borrower
+        WHERE Rollin = p_roll_no AND NameofBook = p_book_name AND Status = 'I'
+    ) THEN
+        -- Get required details
+        SELECT DateofIssue INTO v_dateofissue
+        FROM Borrower
+        WHERE Rollin = p_roll_no AND NameofBook = p_book_name AND Status = 'I'
+        LIMIT 1;
+
+        SET v_today = CURDATE();
+        SET v_days = DATEDIFF(v_today, v_dateofissue);
+
+        -- Fine Calculation
+        IF v_days > 30 THEN
+            SET v_fine_amt = (16 * 5) + ((v_days - 30) * 50);
+        ELSEIF v_days BETWEEN 15 AND 30 THEN
+            SET v_fine_amt = (v_days - 14) * 5;
+        ELSE
+            SET v_fine_amt = 0;
+        END IF;
+
+        -- Update Status to Returned
+        UPDATE Borrower
+        SET Status = 'R'
+        WHERE Rollin = p_roll_no AND NameofBook = p_book_name AND Status = 'I';
+
+        -- Insert into Fine Table if fine applicable
+        IF v_fine_amt > 0 THEN
+            INSERT INTO Fine (Roll_no, Date, Amt)
+            VALUES (p_roll_no, v_today, v_fine_amt);
+        END IF;
+
+        SELECT CONCAT('Book returned. Fine: Rs ', v_fine_amt) AS Message;
+
+    ELSE
+        SELECT 'No such issued book found or already returned.' AS Message;
+    END IF;
+END;
+//
+
+DELIMITER ;
+
+
+
+CALL proc_ReturnBook(101, 'Data Structures');        -- 10 days, no fine
+CALL proc_ReturnBook(102, 'Operating Systems');      -- 20 days, fine = (20-14)*5 = 30 Rs
+CALL proc_ReturnBook(103, 'Database Systems');       -- 35 days, fine = (16*5) + (5*50) = 80 + 250 = 330 Rs
+CALL proc_ReturnBook(104, 'Networks');                -- 5 days, no fine
+CALL proc_ReturnBook(105, 'Algorithms');              -- Already returned, error expected
+CALL proc_ReturnBook(106, 'NonExistentBook');         -- No record, error expected
+
+
+SELECT * FROM Fine;
+

@@ -1,0 +1,97 @@
+write a trigger for Library (bid, bname, doi, status) to update the number of copies (noc) according to ISSUE & RETURN status on update or insert query. Increase the noc if status is RETURN, Decrease noc if status is ISSUE in Library_Audit table(bid,bname,noc,timestampofquery). Write a trigger after update on Library such that if doi is more than 20 days ago then status should be FINE and in the Library_Audit table fine should be equal to no. of days * 10.
+----------------------------------------------------------------------------------------------------------------------
+Initial noc = 5. Should have been stored as 5, but in Library_Audit it should record 4 (5 - 1). doi > 20, so fine applies (25 days × 10 = ₹250)
+---------------------------------------------------------------------------------------------------------------------
+
+CREATE TABLE Library (
+  bid INT PRIMARY KEY,
+  bname VARCHAR(100),
+  doi DATE,
+  status VARCHAR(10),
+  noc INT
+);
+
+
+
+
+CREATE TABLE Library_Audit (
+  bid INT,
+  bname VARCHAR(100),
+  noc INT,
+  timestampofquery DATETIME,
+  fine INT DEFAULT 0
+);
+
+
+
+DELIMITER //
+CREATE TRIGGER trg_set_fine_status
+BEFORE UPDATE ON Library
+FOR EACH ROW
+BEGIN
+  DECLARE days_overdue INT;
+
+  SET days_overdue = DATEDIFF(CURDATE(), NEW.doi);
+
+  -- If more than 20 days since issue, change status before the update is applied
+  IF days_overdue > 20 THEN
+    SET NEW.status = 'FINE';
+  END IF;
+END;
+//
+DELIMITER ;
+
+
+
+DELIMITER //
+
+DROP TRIGGER IF EXISTS trg_library_audit;
+//
+CREATE TRIGGER trg_library_audit
+AFTER INSERT ON Library
+FOR EACH ROW
+BEGIN
+  DECLARE updated_noc INT DEFAULT NEW.noc;
+  DECLARE fine_amt INT DEFAULT 0;
+  DECLARE days_overdue INT;
+
+  SET days_overdue = DATEDIFF(CURDATE(), NEW.doi);
+
+  IF NEW.status = 'RETURN' THEN
+    SET updated_noc = NEW.noc + 1;
+  ELSEIF NEW.status = 'ISSUE' THEN
+    SET updated_noc = NEW.noc - 1;
+  END IF;
+
+  IF days_overdue > 20 THEN
+    SET fine_amt = days_overdue * 10;
+  END IF;
+
+  INSERT INTO Library_Audit (bid, bname, noc, timestampofquery, fine)
+  VALUES (NEW.bid, NEW.bname, updated_noc, NOW(), fine_amt);
+END;
+//
+DELIMITER ;
+
+
+
+INSERT INTO Library (bid, bname, doi, status, noc)
+VALUES 
+(301, 'Database Systems', CURDATE() - INTERVAL 25 DAY, 'ISSUE', 5),
+(302, 'Database Systems', CURDATE() - INTERVAL 35 DAY, 'RETURN', 4),
+(303, 'Operating Systems', CURDATE() - INTERVAL 15 DAY, 'ISSUE', 3),
+(304, 'Operating Systems', CURDATE() - INTERVAL 5 DAY, 'RETURN', 2),
+(305, 'Artificial Intelligence', CURDATE(), 'ISSUE', 3),
+(306, 'Artificial Intelligence', CURDATE() - INTERVAL 22 DAY, 'RETURN', 2);
+
+
+SELECT * FROM Library ORDER BY bid;
+
+SELECT bname, COUNT(*) AS transactions, MAX(noc) AS current_noc
+    FROM Library
+    GROUP BY bname;
+
+ SELECT * FROM Library_Audit WHERE bname IN (
+    'Database Systems', 'Operating Systems', 'Artificial Intelligence'
+    ) ORDER BY timestampofquery DESC;
+

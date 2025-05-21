@@ -1,0 +1,108 @@
+6. Create tables CitiesIndia(pincode,nameofcity,earliername,area,population,avgrainfall) 
+Categories(Type,pincode) Note:- Enter data only in CitiesIndia
+Write PL/SQL Procedure & function to find the population density of the cities. If the population density is above 3000 then Type of city must be entered as High Density in Category table. Between 2999 to 1000 as Moderate and below 999 as Low Density. Error must be displayed for population less than 10 or greater than 25718.
+---------------------------------------------------------------------------------------------------------------------
+
+Population Density = population / area
+
+CREATE TABLE CitiesIndia (
+    pincode INT PRIMARY KEY,
+    nameofcity VARCHAR(50),
+    earliername VARCHAR(50),
+    area FLOAT,       -- area in sq km (or float)
+    population INT,
+    avgrainfall FLOAT
+);
+
+
+CREATE TABLE Categories (
+    Type VARCHAR(20),
+    pincode INT,
+    FOREIGN KEY (pincode) REFERENCES CitiesIndia(pincode)
+);
+
+
+INSERT INTO CitiesIndia (pincode, nameofcity, earliername, area, population, avgrainfall) VALUES
+(110001, 'New Delhi', 'Delhi', 42.0, 25000, 600),
+(110004, 'ErrorCity1', 'Erroneous', 20.0, 5, 700),     
+(560001, 'Bangalore', 'Bengaluru', 709.5, 15000, 900),     
+(700001, 'Kolkata', 'Calcutta', 205.0, 12000, 1600),
+(110006, 'ModerateCity1', 'ModCityOld', 5.0, 7000, 800),
+(110007, 'ModerateCity2', 'ModCityOld2', 4.0, 9000, 700),
+(110008, 'HighDensityCity1', 'HighOldCity1', 3.0, 12000, 600),
+(110009, 'HighDensityCity2', 'HighOldCity2', 2.0, 7000, 500);
+
+
+DELIMITER //
+CREATE FUNCTION get_density(p_pin INT)
+RETURNS FLOAT
+DETERMINISTIC
+BEGIN
+    DECLARE v_density FLOAT;
+    DECLARE v_area FLOAT;
+    DECLARE v_population INT;
+
+    SELECT area, population INTO v_area, v_population
+    FROM CitiesIndia
+    WHERE pincode = p_pin;
+
+    IF v_population < 10 OR v_population > 25718 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Population must be between 10 and 25718.';
+    END IF;
+
+    SET v_density = v_population / v_area;
+
+    RETURN v_density;
+END;
+//
+DELIMITER ;
+
+
+
+
+
+
+DELIMITER //
+CREATE PROCEDURE insert_category(IN p_pin INT)
+BEGIN
+    DECLARE v_density FLOAT;
+    DECLARE v_type VARCHAR(20);
+
+    -- Calculate density
+    SET v_density = (SELECT population / area FROM CitiesIndia WHERE pincode = p_pin);
+
+    -- Validate population
+    IF (SELECT population FROM CitiesIndia WHERE pincode = p_pin) < 10
+       OR (SELECT population FROM CitiesIndia WHERE pincode = p_pin) > 25718 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Population must be between 10 and 25718.';
+    END IF;
+
+    -- Decide city type based on density
+    IF v_density > 3000 THEN
+        SET v_type = 'High Density';
+    ELSEIF v_density BETWEEN 1000 AND 2999 THEN
+        SET v_type = 'Moderate';
+    ELSE
+        SET v_type = 'Low Density';
+    END IF;
+
+    -- Insert into Categories table
+    INSERT INTO Categories(Type, pincode)
+    VALUES (v_type, p_pin);
+
+    SELECT CONCAT('Category inserted for pincode ', p_pin) AS message;
+END;
+//
+DELIMITER ;
+
+
+
+CALL insert_category(110001);
+CALL insert_category(110004); --errornous.
+CALL insert_category(560001);
+CALL insert_category(110007); 
+CALL insert_category(110009);
+
+select * from categories;
+
+
