@@ -1,0 +1,37 @@
+Create a collection sites(url,dateofaccess). Write a MapReduce function to find the no. of times a site was accessed in a month.
+---------------------------------------------------------------------------------------------------------------------
+
+use siteDB
+
+db.sites.insertMany([
+  { url: "example.com", dateofaccess: new Date("2025-01-15") },
+  { url: "example.com", dateofaccess: new Date("2025-01-25") },
+  { url: "openai.com", dateofaccess: new Date("2025-01-05") },
+  { url: "example.com", dateofaccess: new Date("2025-02-12") },
+  { url: "openai.com", dateofaccess: new Date("2025-02-18") },
+  { url: "example.com", dateofaccess: new Date("2025-02-25") }
+])
+
+
+var mapFunction = function() {
+  var month = this.dateofaccess.getMonth() + 1; // Jan = 0, so add 1
+  var year = this.dateofaccess.getFullYear();
+  var key = this.url + "-" + year + "-" + month;
+  emit(key, 1);
+};
+
+var reduceFunction = function(key, values) {
+  return Array.sum(values);
+};
+
+
+db.sites.mapReduce(
+  mapFunction,
+  reduceFunction,
+  {
+    out: "site_access_stats"
+  }
+)
+
+db.site_access_stats.find().pretty()
+

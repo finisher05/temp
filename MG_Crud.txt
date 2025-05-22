@@ -1,0 +1,38 @@
+Create  following collection and  using MongoDB  implement all CRUD operations.
+Orders( cust_id, amount, status)
+---------------------------------------------------------------------------------------------------------------------
+
+
+use orderDB
+
+db.createCollection("orders")
+
+db.orders.insertMany([
+  { cust_id: 101, amount: 500, status: "Pending" },
+  { cust_id: 102, amount: 1000, status: "Shipped" },
+  { cust_id: 103, amount: 750, status: "Delivered" }
+])
+
+
+db.orders.find()
+
+db.orders.find({ status: "Pending" })
+
+db.orders.find({ amount: { $gt: 700 } })
+
+db.orders.updateOne(
+  { cust_id: 101 },
+  { $set: { status: "Shipped" } }
+)
+
+db.orders.updateMany(
+  { status: "Delivered" },
+  { $inc: { amount: 50 } }
+)
+
+db.orders.deleteOne({ cust_id: 103 })
+
+db.orders.deleteMany({ amount: { $lt: 600 } })
+
+
+

@@ -1,0 +1,27 @@
+12 Implement Indexing and querying with MongoDB using following example.
+Students(stud_id, stud_name,stud_addr,stud_marks)
+----------------------------------------------------------------------------------------------------------------------
+use studentDB
+
+db.createCollection("students")
+
+db.students.insertMany([
+  { stud_id: 101, stud_name: "Alice", stud_addr: "Pune", stud_marks: 85 },
+  { stud_id: 102, stud_name: "Bob", stud_addr: "Mumbai", stud_marks: 92 },
+  { stud_id: 103, stud_name: "Charlie", stud_addr: "Delhi", stud_marks: 76 },
+  { stud_id: 104, stud_name: "David", stud_addr: "Pune", stud_marks: 88 },
+  { stud_id: 105, stud_name: "Eva", stud_addr: "Delhi", stud_marks: 95 }
+])
+
+
+db.students.createIndex({ stud_id: 1 })
+
+db.students.createIndex({ stud_addr: 1 })
+
+db.students.find({ stud_id: 102 })
+
+db.students.find({ stud_addr: "Pune" })
+
+db.students.find({ stud_marks: { $gt: 85 } })
+
+db.students.getIndexes()

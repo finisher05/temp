@@ -1,0 +1,85 @@
+Implement all Aggregation operations and types of indexing with following collection using MongoDB. 
+Employee(emp_id, emp_name,emp_dept,salary)
+---------------------------------------------------------------------------------------------------------------------
+
+use companyDB;
+
+db.createCollection("Employee");
+
+db.Employee.insertMany([
+  { emp_id: 1, emp_name: "Alice", emp_dept: "HR", salary: 50000 },
+  { emp_id: 2, emp_name: "Bob", emp_dept: "IT", salary: 75000 },
+  { emp_id: 3, emp_name: "Charlie", emp_dept: "HR", salary: 55000 },
+  { emp_id: 4, emp_name: "David", emp_dept: "IT", salary: 80000 },
+  { emp_id: 5, emp_name: "Eva", emp_dept: "Finance", salary: 60000 },
+  { emp_id: 6, emp_name: "Frank", emp_dept: "Finance", salary: 62000 },
+  { emp_id: 7, emp_name: "Grace", emp_dept: "HR", salary: 53000 }
+]);
+
+
+db.Employee.aggregate([
+  {
+    $group: {
+      _id: "$emp_dept",
+      total_salary: { $sum: "$salary" },
+      avg_salary: { $avg: "$salary" },
+      count: { $sum: 1 }
+    }
+  }
+]);
+
+
+db.Employee.aggregate([
+  { $match: { salary: { $gt: 60000 } } }
+]);
+
+
+db.Employee.aggregate([
+  { $sort: { salary: -1 } }
+]);
+
+
+db.Employee.aggregate([
+  { $project: { _id: 0, emp_name: 1, emp_dept: 1 } }
+]);
+
+
+db.Employee.aggregate([
+  {
+    $group: {
+      _id: "$emp_dept",
+      employee_count: { $sum: 1 }
+    }
+  }
+]);
+
+
+db.Employee.aggregate([
+  {
+    $group: {
+      _id: null,
+      max_salary: { $max: "$salary" },
+      min_salary: { $min: "$salary" }
+    }
+  }
+]);
+
+
+
+[Single field index]
+db.Employee.createIndex({ emp_dept: 1 });
+
+[compound index]
+db.Employee.createIndex({ emp_dept: 1, salary: -1 });
+
+[Unique index]
+db.Employee.createIndex({ emp_id: 1 }, { unique: true });
+
+[Text index- enable text search on field]
+db.Employee.createIndex({ emp_name: "text" });
+
+[hashed]
+db.Employee.createIndex({ emp_id: "hashed" });
+
+
+db.Employee.getIndexes()
